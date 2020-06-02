@@ -1,0 +1,11 @@
+*.pyc
+__pycache__
+publisher_sceptre_config*.yml
+.vscode
+changelog.yaml
+published.ini
+sample_person_data.csv
+build
+dist
+*egg*
+**/*.pyc
