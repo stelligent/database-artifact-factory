@@ -1,0 +1,189 @@
+Parameters:
+  SourceCluster:
+    Type: String
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  Username:
+    Type: String
+    NoEcho: true
+  Password:
+    Type: String
+    NoEcho: true
+  DbInstanceClass:
+    Type: String
+  ClientIp: 
+    Type: String
+  #not nec  
+  DatabaseName:
+    Type: String
+
+Resources:
+  SubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties: 
+      DBSubnetGroupDescription: Publisher Generated Subnet Group
+      SubnetIds: !Ref SubnetIds
+ 
+  ClusterLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: rds
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - rds:*
+              Resource:
+              - '*'
+
+  ClusterLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.7
+      Role: !GetAtt ClusterLambdaRole.Arn
+      Handler: index.lambda_handler
+      Timeout: 900
+      Code:
+        ZipFile: |
+          import boto3
+          import time
+          import random
+          import cfnresponse
+
+          def lambda_handler(event, context):
+              print(f"event: {event}")
+              try:
+                  rds = boto3.client('rds')
+                  if event['RequestType'] == 'Delete':
+                      delete_db_cluster_response = rds.delete_db_cluster(
+                          DBClusterIdentifier=event['PhysicalResourceId'],
+                          SkipFinalSnapshot=True
+                      )
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                      return 
+                  elif event['RequestType'] == 'Update':
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                      return 
+                  else:
+                      id = f"{event['LogicalResourceId']}{int(time.time())}{random.randint(0,65535)}"
+                      print(f"restoring to cluster id {id}")
+                      restore_db_cluster_to_point_in_time_response = rds.restore_db_cluster_to_point_in_time(
+                        DBClusterIdentifier=id,
+                        RestoreType='copy-on-write',
+                        SourceDBClusterIdentifier=event['ResourceProperties']['SourceDBClusterIdentifier'],
+                        UseLatestRestorableTime=True,
+                        Port=5432,
+                        DBSubnetGroupName=event['ResourceProperties']['DBSubnetGroupName'],
+                        VpcSecurityGroupIds=event['ResourceProperties']['VpcSecurityGroupIds']
+                      )
+                      print(f"response: {restore_db_cluster_to_point_in_time_response}")
+                      
+                      # switch up to polling approach if making this real
+                      while(True):
+                          describe_db_clusters_response = rds.describe_db_clusters(
+                            DBClusterIdentifier=id
+                          )
+                          print(f"polling: {describe_db_clusters_response}")
+                          if describe_db_clusters_response['DBClusters']:
+                              status = describe_db_clusters_response['DBClusters'][0]['Status']
+                              if status == 'available':
+                                  break
+                          time.sleep(20)
+
+                      modify_db_cluster_response = rds.modify_db_cluster(
+                        DBClusterIdentifier=id,
+                        ApplyImmediately=True,
+                        MasterUserPassword=event['ResourceProperties']['MasterUserPassword']
+                      )
+                      
+                      responseData = {
+                        'Id': id,
+                        'Endpoint': restore_db_cluster_to_point_in_time_response['DBCluster']['Endpoint']
+                      }
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData, id)
+                      return
+              except Exception as ex:
+                  print(f"fail: {ex}")
+                  responseData = {
+                    'Reason': str(ex)
+                  }
+                  cfnresponse.send(event, context, cfnresponse.FAILED, responseData)
+                  return
+
+              responseData = {
+                'Reason': 'No clue what the heck happened'
+              }
+              cfnresponse.send(event, context, cfnresponse.FAILED, responseData)
+              return                   
+
+
+  ClonedCluster:
+    Type: AWS::CloudFormation::CustomResource
+    Properties: 
+      ServiceToken: !GetAtt ClusterLambda.Arn
+      MasterUserPassword: !Ref Password
+      DBSubnetGroupName: !Ref SubnetGroup 
+      VpcSecurityGroupIds: 
+        - !Ref SecGroup
+      SourceDBClusterIdentifier: !Ref SourceCluster
+
+  # Cluster:
+  #   Type: AWS::RDS::DBCluster
+  #   DeletionPolicy: Delete
+  #   Properties: 
+  #     DBClusterParameterGroupName: default.aurora-postgresql11
+  #     Engine: aurora-postgresql
+  #     EngineMode: provisioned
+  #     EngineVersion: 11.6
+  #     MasterUsername: !Ref Username
+  #     MasterUserPassword: !Ref Password
+  #     StorageEncrypted: true
+
+  #     #ignoring
+  #     DBSubnetGroupName: !Ref SubnetGroup 
+  #     VpcSecurityGroupIds: 
+  #       - !Ref SecGroup
+
+  #     SourceDBClusterIdentifier: !Ref SourceCluster
+  #     RestoreType: copy-on-write
+  #     UseLatestRestorableTime: true
+  #     Port: 5432
+
+  Instance1:
+    Type: AWS::RDS::DBInstance
+    Properties: 
+      DBClusterIdentifier: !GetAtt ClonedCluster.Id #!Ref Cluster
+      DBInstanceClass: !Ref DbInstanceClass
+      Engine: aurora-postgresql
+      # fix this for real world
+      PubliclyAccessible: true
+
+  SecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Publisher Generted Sec Group
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        IpProtocol: tcp
+        ToPort: 5432 
+        CidrIp: !Ref ClientIp
+        FromPort: 5432
+
+Outputs:
+  Endpoint:
+    Value: !GetAtt ClonedCluster.Endpoint
+  ClusterId:
+    Value: !GetAtt ClonedCluster.Id

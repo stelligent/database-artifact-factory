@@ -1,0 +1,69 @@
+Parameters:
+  SourceCluster:
+    Type: String
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  Username:
+    Type: String
+    NoEcho: true
+  Password:
+    Type: String
+    NoEcho: true
+  DbInstanceClass:
+    Type: String
+  ClientIp: 
+    Type: String
+  DatabaseName:
+    Type: String
+
+Resources:
+  SubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties: 
+      DBSubnetGroupDescription: Publisher Generated Subnet Group
+      SubnetIds: !Ref SubnetIds
+ 
+  Cluster:
+    Type: AWS::RDS::DBCluster
+    DeletionPolicy: Delete
+    Properties: 
+      DBClusterParameterGroupName: default.aurora-postgresql11
+      DBSubnetGroupName: !Ref SubnetGroup
+      Engine: aurora-postgresql
+      EngineMode: provisioned
+      EngineVersion: 11.6
+      MasterUsername: !Ref Username
+      MasterUserPassword: !Ref Password
+      StorageEncrypted: true
+      VpcSecurityGroupIds: 
+        - !Ref SecGroup
+      Port: 5432
+      DatabaseName: !Ref DatabaseName
+
+  Instance1:
+    Type: AWS::RDS::DBInstance
+    Properties: 
+      DBClusterIdentifier: !Ref Cluster
+      DBInstanceClass: !Ref DbInstanceClass
+      Engine: aurora-postgresql
+      # fix this for real world
+      PubliclyAccessible: true
+
+  SecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Publisher Generted Sec Group
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        IpProtocol: tcp
+        ToPort: 5432 
+        CidrIp: !Ref ClientIp
+        FromPort: 5432
+
+Outputs:
+  Endpoint:
+    Value: !GetAtt Cluster.Endpoint.Address
+  ClusterId:
+    Value: !Ref Cluster
