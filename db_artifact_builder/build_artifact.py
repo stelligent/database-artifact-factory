@@ -14,8 +14,8 @@ def build_artifact_cli():
 
     args = arg_parser.parse_args()
 
-    rds_client = boto3.client('rds')
-    image_id = ImageBuilder(args.config_file.name, rds_client).publish()
+    session = boto3.Session()
+    image_id = ImageBuilder(args.config_file.name, session).publish()
     print(f"image id: {image_id}")
 
 if __name__ == "__main__": 

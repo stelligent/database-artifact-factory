@@ -6,9 +6,9 @@ import pkg_resources
 import os
 
 class ImageBuilder:
-    def __init__(self, config_file, rds_client):
+    def __init__(self, config_file, session):
         self._config_file = config_file
-        self._rds_client = rds_client
+        self._session = session
 
     def publish(self, docker_dir='/var/tmp/db_artifact_builder/'):
         config = DbArtifactBuilderConfig().parse(self._config_file)
@@ -18,10 +18,10 @@ class ImageBuilder:
         os.mkdir(docker_dir)
 
         output_path = os.path.join(docker_dir, 'sceptre_config_create.yml')
-        _ = SceptreParameterGenerator(self._rds_client).generate(config, output_path, 'create')
+        _ = SceptreParameterGenerator(self._session).generate(config, output_path, 'create')
 
         output_path = os.path.join(docker_dir, 'sceptre_config_clone.yml')
-        _ = SceptreParameterGenerator(self._rds_client).generate(config, output_path, 'clone')
+        _ = SceptreParameterGenerator(self._session).generate(config, output_path, 'clone')
 
         self._copy_resources_under_docker_dir(
             docker_dir,
@@ -39,15 +39,24 @@ class ImageBuilder:
 
     ##################################PRIVATE#################################
 
+    def _write_empty_file(self, path):
+        with open(path,'w') as out:
+            out.write('')
+
     def _copy_resources_under_docker_dir(self, docker_dir, config):
         copyfile(
             self._resource('Dockerfile'),
             os.path.join(docker_dir, 'Dockerfile')
         )
-        copyfile(
-            config['source_db']['liquibase_changelog_path'], 
-            os.path.join(docker_dir, 'changelog.yaml')
-        )
+        if config['source_db']['liquibase_changelog_path'] != 'dontcare':
+            copyfile(
+                config['source_db']['liquibase_changelog_path'], 
+                os.path.join(docker_dir, 'changelog.yaml')
+            )
+        else:
+            self._write_empty_file(
+                os.path.join(docker_dir, 'changelog.yaml')
+            )
 
         copyfile(
             self._config_file, 

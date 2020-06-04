@@ -53,13 +53,14 @@ An example INI file follows:
 ```
 [source_db]
 source_db_cluster_id = dbartifact-prod-create-cluster-1k326eivoq3i0
-liquibase_changelog_path = /var/tmp/changelog.yaml
+liquibase_changelog_path = /var/tmp/changelog.yaml 
+# ^^^^^^ can be dontcare if just cloning
 
 [target_db]
 subnet_ids = source
-vpc_id = source
 instance_type = db.r4.large
-database_name = fred
+database_name = createddbname 
+# ^^^^^^ can be dontcare if just cloning
 ```
                 
 The singular published artifact contains all the information to do both the create or the clone.  
@@ -70,7 +71,10 @@ for create, and some are only necessary for clone.
   This is the Aurora RDS database cluster id to clone.  Even when creating a fresh database cluster,
   there should be a "source" database that it is re-creating - just without data.
 * *liquibase_changelog_path*
-  This is the local path to a Liquibase changelog.yaml file.  This value must end in .yaml.  For more information
+  This is the local path to a Liquibase changelog.yaml file.  This can be `dontcare`
+  if you only want the artifact to be able to clone. 
+  
+  If the value is not dontcare, then this value must end in .yaml and reference an existing file.  For more information
   on changelog format, please see: https://docs.liquibase.com/concepts/basic/changelog.html?_ga=2.262345164.1315656423.1591044713-322389793.1589995557. An example changelog:
 ```
 databaseChangeLog:  
@@ -104,17 +108,13 @@ databaseChangeLog:
   This can be a comma-delimited list of two or more subnet ids to create the target db in, e.g. subnet-1234, subnet-456
   or it can be "source" and discover the subnet-ids from the source db cluster.
 
-  Make sure these subnet_ids are in different AZ, and jive with the vpc_id if you don't select "source"
+  Make sure these subnet_ids are in different AZ.
 
-* *vpc_id*
-  This can be an explicit vpc_id to create the target db in, e.g. vpc-1234
-  or it can be "source" and discover the vpc_id from the source db cluster.
-
-  Make sure this jives with the subnet_ids if you don't select "source"
 * *instance_type*
   The instance type of the DB instance created in the cluster, e.g. db.r4.xlarge
 * *database_name*
-  In the create case, the name of a database to create and apply the liquibase changelog to.
+  In the create case, the name of a database to create and apply the liquibase changelog to.  This can be dontcare
+  if you only want the artifact to be able to clone.
 
 
 ### Building
@@ -152,7 +152,7 @@ Also, be sure AWS_DEFAULT_REGION is set in the environment to us-east-1.
 ```
 db-artifact-converge --create_mode create \
                      --db_username fred \
-                     --db_password thisisafakep@ssw0rd
+                     --db_password thisisafakepassw0rd
 ```
 If any of those defaults are inappropriate, please invoke the `db-artifact-converge -h` to see the other options.
 
@@ -162,7 +162,6 @@ When the database is created, the Liquibase changelog is applied to the database
 psql -h <endpoint> -U fred -d <database_name>
 Password for user fred: ******
 \dt
-\q
 ```
 ### Clone an Existing Database
 The following is the minimal command to clone an existing database.  It presumes a few things:
@@ -170,18 +169,16 @@ The following is the minimal command to clone an existing database.  It presumes
 * AWS profile is "default".
 * the Docker image db-artifact:latest contains the artifact to converge
 
-BEWARE - you must specify the username and password, but the username is ignored and follows from the source cluster
+BEWARE - you must specify the password, but the username follows from the source cluster
 ```
 db-artifact-converge --create_mode clone \
-                     --db_username fred \
-                     --db_password thisisafakep@ssw0rd
+                     --db_password thisisafakepassw0rd
 ```
 
 If any of those defaults are inappropriate, please invoke the `db-artifact-converge -h` to see the other options.
 
 ## Future Direction
-* Parameterize support for myql v postgresql
-* Add support for other configuration items for the RDS cluster
+* Parameterize support for mysql v postgresql
+* Add support for other operational configuration items for the RDS cluster
 * better progress reporting and troubleshooting mechanisms
 * control over stack names
-* discover vpc_id from subnets to reduce configuration pain

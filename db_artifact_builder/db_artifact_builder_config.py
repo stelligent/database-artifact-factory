@@ -21,14 +21,15 @@ class DbArtifactBuilderConfig:
         if not self._validate_subnet_ids(config):
             raise ConfigException("target_db/subnet_ids must be set to source or a comma-delmited-list of subnets, e.g subnet-1,subnet2,subnet-3")
 
-        if not self._validate_vpc_id(config):
-            raise ConfigException("target_db/vpc_id must be set to source or a vpc id, e.g vpc-1234")
+        #if not self._validate_vpc_id(config):
+        #    raise ConfigException("target_db/vpc_id must be set to source or a vpc id, e.g vpc-1234")
 
-        if not os.path.isfile(config['source_db']['liquibase_changelog_path']):
-            raise ConfigException("source_db/liquibase_changelog_path must be a local file path")
+        if config['source_db']['liquibase_changelog_path'] != 'dontcare':
+            if not os.path.isfile(config['source_db']['liquibase_changelog_path']):
+                raise ConfigException("source_db/liquibase_changelog_path must be a local file path")
 
-        if not config['source_db']['liquibase_changelog_path'].endswith('.yaml'):
-            raise ConfigException("source_db/liquibase_changelog_path must be a .yaml file")
+            if not config['source_db']['liquibase_changelog_path'].endswith('.yaml'):
+                raise ConfigException("source_db/liquibase_changelog_path must be a .yaml file")
 
         return config
 
@@ -61,7 +62,6 @@ class DbArtifactBuilderConfig:
             ],
             'target_db': [
                 'subnet_ids',
-                'vpc_id',
                 'instance_type',
                 'database_name'
             ]

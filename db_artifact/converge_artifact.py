@@ -2,6 +2,8 @@
 import argparse
 import os
 import docker
+import sys
+
 
 def converge_artifact_cli():
     arg_parser = argparse.ArgumentParser(description='Converge a database artifact')
@@ -29,7 +31,7 @@ def converge_artifact_cli():
         '--db_username',            
         type=str,
         help='The master username for the created db (cloned follows from the source)',
-        required=True
+        required=False
     )
     arg_parser.add_argument(
         '--db_password',            
@@ -45,6 +47,14 @@ def converge_artifact_cli():
     )  
     args = arg_parser.parse_args()
 
+    if args.create_mode == 'create' and not args.db_username:
+        print("If the create_mode is create, the username must be specified")
+        sys.exit(1)
+    elif args.create_mode == 'create' and args.db_username:
+        db_username = args.db_username
+    else:
+        db_username = 'dontcare'
+
     client = docker.from_env()
     output = client.containers.run(
         image=args.docker_image,
@@ -53,7 +63,7 @@ def converge_artifact_cli():
         },
         environment={
             'AWS_PROFILE': args.aws_profile,
-            'DB_USERNAME': args.db_username,
+            'DB_USERNAME': db_username,
             'DB_PASSWORD': args.db_password,
             'CREATE_MODE': args.create_mode
         }

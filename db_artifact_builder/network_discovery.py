@@ -2,8 +2,17 @@ import boto3
 
 class NetworkDiscovery:
 
-  def __init__(self, rds_client):
-      self.rds = rds_client
+  def __init__(self, session):
+      self._rds_client = session.client('rds')
+      self._ec2_client = session.client('ec2')
+
+  def discover_vpc_id(self, subnet_id):
+      describe_subnets_response = self._ec2_client.describe_subnets(
+          SubnetIds=[
+              subnet_id
+          ]
+      )
+      return describe_subnets_response['Subnets'][0]['VpcId']
 
   def discover_db_subnetgroup_info(self, source_db_cluster):
       '''
@@ -14,11 +23,11 @@ class NetworkDiscovery:
       Then the subnet and vpc info is returned in a tuple
       '''
 
-      subnet_group_name = self.rds.describe_db_clusters(
+      subnet_group_name = self._rds_client.describe_db_clusters(
           DBClusterIdentifier=source_db_cluster,
       )['DBClusters'][0]['DBSubnetGroup']
 
-      subnet_group = self.rds.describe_db_subnet_groups(
+      subnet_group = self._rds_client.describe_db_subnet_groups(
         DBSubnetGroupName=subnet_group_name,
       )['DBSubnetGroups'][0]
 
