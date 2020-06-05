@@ -1,0 +1,104 @@
+Resources:
+  DbArtifactPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties: 
+      Description: Lesser but not quite Least Privilege to allow DB artifact Factory to create and clone database
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          ##### cfn
+          - Effect: Allow
+            Action:
+              - cloudformation:*
+            Resource: '*'
+
+          ##### CLONE
+          - Effect: Allow
+            Action:
+              - ec2:DescribeVpcs
+              - ec2:DescribeSubnets
+              - ec2:DescribeAvailabilityZones
+              - ec2:DescribeAccountAttributes
+              - ec2:DescribeInternetGateways
+              - ec2:DescribeVpcAttribute
+              - ec2:CreateTags
+              - ec2:CreateSecurityGroup
+              - ec2:DescribeSecurityGroups
+              - ec2:AuthorizeSecurityGroupIngress
+              - ec2:DeleteSecurityGroup
+            Resource: '*'
+      
+            #
+            # this iam permissions are nec because clone creates a lambda for a custom
+            # resource to do the copy-on-write because cfn
+            # ignores other parameters with copy-on-write
+            # this is an invitation to privilege escalation so you
+            # could lock this down with a permission boundary or the like
+            #
+          - Effect: Allow
+            Action:
+              - iam:GetRolePolicy
+              - iam:CreateRole
+              - iam:AttachRolePolicy
+              - iam:PutRolePolicy
+              - iam:GetRole
+              - iam:DeleteRole
+              - iam:DetachRolePolicy
+              - iam:DeleteRolePolicy
+              - iam:PassRole
+            Resource: '*'
+
+          - Effect: Allow
+            Action:
+              - rds:DescribeDBInstances
+              - rds:CreateDBInstance
+              - rds:DescribeDBSubnetGroups
+              - rds:CreateDBSubnetGroup
+              - rds:DeleteDBSubnetGroup
+              - rds:DeleteDBInstance
+            # this resource could be fine tuned if we picked resource names
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - lambda:GetFunction
+              - lambda:GetFunctionConfiguration
+              - lambda:CreateFunction
+              - lambda:DeleteFunction
+              - lambda:InvokeFunction
+            Resource: '*'
+
+          ####### CREATE some overlap but making it explicit
+          - Effect: Allow
+            Action:
+              - rds:DescribeDBInstances
+              - rds:DescribeDBClusters
+              - rds:DescribeDBSubnetGroups
+              - rds:CreateDBCluster
+              - rds:CreateDBSubnetGroup
+              - rds:CreateDBInstance
+              - rds:DeleteDBInstance
+              - rds:DeleteDBCluster
+              - rds:DeleteDBSubnetGroup
+            # this resource could be fine tuned if we picked resource names
+            Resource: '*'
+
+          - Effect: Allow
+            Action:
+              - ec2:DescribeVpcAttribute
+              - ec2:DescribeSecurityGroups
+              - ec2:DescribeSubnets
+              - ec2:CreateSecurityGroup
+              - ec2:DescribeAvailabilityZones
+              - ec2:CreateTags
+              - ec2:AuthorizeSecurityGroupIngress
+              - ec2:DescribeVpcs
+              - ec2:DescribeAccountAttributes
+              - ec2:DescribeInternetGateways
+              - ec2:DeleteSecurityGroup
+            Resource: '*'
+
+          - Effect: Allow
+            Action:
+              - kms:DescribeKey
+              - kms:CreateGrant
+            Resource: '*'

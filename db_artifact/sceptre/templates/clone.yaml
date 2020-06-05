@@ -45,7 +45,10 @@ Resources:
             Statement:
             - Effect: Allow
               Action:
-              - rds:*
+              - rds:DeleteDBCluster
+              - rds:DescribeDBClusters
+              - rds:ModifyDBCluster
+              - rds:RestoreDBClusterToPointInTime
               Resource:
               - '*'
 
