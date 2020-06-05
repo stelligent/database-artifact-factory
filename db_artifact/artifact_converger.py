@@ -13,6 +13,8 @@ class ArtifactConverger:
         self._create_mode = create_mode
 
     def converge(self, db_username, db_password, db_name):
+        self._patch_universal_config()
+
         self._patch_client_options(
             db_username, 
             db_password,
@@ -78,6 +80,21 @@ class ArtifactConverger:
             open(config_path, 'r').read(), 
             Loader=yaml.FullLoader
         )
+
+    def _patch_universal_config(self):
+        project_path = self._sceptre_dir()
+        config_path = os.path.join(
+            project_path, 
+            'config', 
+            'config.yaml'
+        )
+        config = self._read_yaml_file(config_path)
+        config['project_code'] = f"dbartifact{int(time.time())}"
+        config['region'] = 'us-east-1'
+        self._write_yaml_file(
+            config,
+            config_path
+        )      
 
     def _patch_client_options(self, db_username, db_password, client_ip):
         project_path = self._sceptre_dir()
