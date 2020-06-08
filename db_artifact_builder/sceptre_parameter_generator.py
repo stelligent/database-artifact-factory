@@ -20,8 +20,7 @@ class SceptreParameterGenerator:
             'SourceCluster': config['source_db']['source_db_cluster_id'],
             'SubnetIds': subnet_ids,
             'VpcId': vpc_id,
-            'DbInstanceClass': config['target_db']['instance_type'],
-            'DatabaseName': config['target_db']['database_name']
+            'DbInstanceClass': config['target_db']['instance_type']
         }
         sceptre_config = {
             'template_path': f'{create_mode.lower()}.yaml',

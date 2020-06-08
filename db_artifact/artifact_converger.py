@@ -9,14 +9,13 @@ import time
 
 
 class ArtifactConverger:
-    def __init__(self, create_mode):
-        self._create_mode = create_mode
+    def __init__(self):
+        self._create_mode = 'clone'
 
-    def converge(self, db_username, db_password, db_name):
-        self._patch_universal_config()
+    def converge(self, db_password):
+        config = self._patch_universal_config()
 
         self._patch_client_options(
-            db_username, 
             db_password,
             self._my_ip_address()
         )
@@ -27,15 +26,7 @@ class ArtifactConverger:
         _ = plan.launch()
         endpoint = self._endpoint_from_sceptre_outputs(plan)
 
-        if self._create_mode == 'create':
-            self._invoke_liquibase(
-                endpoint, 
-                db_username, 
-                db_password, 
-                db_name
-            )
-
-        return endpoint
+        return endpoint, f"{config['project_code']}-prod-clone"
 
     ##### PRIVATE ####################
 
@@ -52,20 +43,6 @@ class ArtifactConverger:
 
     def _sceptre_dir(self):
         return pkg_resources.resource_filename('db_artifact', 'sceptre')
-
-    def _invoke_liquibase(self, endpoint, db_username, db_password, db_name):
-        subprocess.check_output(
-            [
-                '/liquibase/liquibase', 
-                '--driver=org.postgresql.Driver',
-                '--classpath=/liquibase/postgresql-42.2.12.jar',
-                f'--url=jdbc:postgresql://{endpoint}:5432/{db_name}',
-                '--changeLogFile=/liquibase/changelog.yaml',
-                f'--username={db_username}',
-                f'--password={db_password}',
-                'update'
-            ]
-        )
 
     def _my_ip_address(self):
         response = requests.get('https://api.ipify.org?format=json')
@@ -95,8 +72,9 @@ class ArtifactConverger:
             config,
             config_path
         )      
+        return config
 
-    def _patch_client_options(self, db_username, db_password, client_ip):
+    def _patch_client_options(self, db_password, client_ip):
         project_path = self._sceptre_dir()
         config_path = os.path.join(
             project_path, 
@@ -105,7 +83,6 @@ class ArtifactConverger:
             f"{self._create_mode}.yaml"
         )
         config = self._read_yaml_file(config_path)
-        config['parameters']['Username'] = db_username
         config['parameters']['Password'] = db_password
         config['parameters']['ClientIp'] = client_ip
         self._write_yaml_file(

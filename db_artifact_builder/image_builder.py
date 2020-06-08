@@ -17,9 +17,6 @@ class ImageBuilder:
             rmtree(docker_dir)
         os.mkdir(docker_dir)
 
-        output_path = os.path.join(docker_dir, 'sceptre_config_create.yml')
-        _ = SceptreParameterGenerator(self._session).generate(config, output_path, 'create')
-
         output_path = os.path.join(docker_dir, 'sceptre_config_clone.yml')
         _ = SceptreParameterGenerator(self._session).generate(config, output_path, 'clone')
 
@@ -29,8 +26,7 @@ class ImageBuilder:
         )
 
         image, output = self._build_image(
-            docker_dir,
-            config['target_db']['database_name']
+            docker_dir
         )
         for output_dict in output:
             self._parse_docker_line(output_dict)
@@ -48,15 +44,6 @@ class ImageBuilder:
             self._resource('Dockerfile'),
             os.path.join(docker_dir, 'Dockerfile')
         )
-        if config['source_db']['liquibase_changelog_path'] != 'dontcare':
-            copyfile(
-                config['source_db']['liquibase_changelog_path'], 
-                os.path.join(docker_dir, 'changelog.yaml')
-            )
-        else:
-            self._write_empty_file(
-                os.path.join(docker_dir, 'changelog.yaml')
-            )
 
         copyfile(
             self._config_file, 
@@ -81,14 +68,9 @@ class ImageBuilder:
         except ValueError:
             pass
 
-    def _build_image(self, docker_dir, db_target_name):
+    def _build_image(self, docker_dir):
         client = docker.from_env()
         return client.images.build(
             path=docker_dir,
-            tag='db-artifact',
-            buildargs={
-                'DB_TARGET_NAME':db_target_name
-            }
+            tag='db-artifact'
         )
-
-

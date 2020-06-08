@@ -22,10 +22,7 @@ the source and target, while deltas to the target are recorded separately.
 
 The "database artifact" produced by this module is a Docker image.  The image
 contains all the necessary metadata and automation to do the necessary.  A Docker image
-was used because the automation contains a fairly diverse mix of software components:
-* python automation
-* CloudFormation 
-* liquibase - a Java/JVM based tool
+was used because the automation (originally) contains a fairly diverse mix of software components.
 
 ## Installing the Database Artifact Factory
 
@@ -53,14 +50,10 @@ An example INI file follows:
 ```
 [source_db]
 source_db_cluster_id = dbartifact-prod-create-cluster-1k326eivoq3i0
-liquibase_changelog_path = /var/tmp/changelog.yaml 
-# ^^^^^^ can be dontcare if just cloning
 
 [target_db]
 subnet_ids = source
 instance_type = db.r4.large
-database_name = createddbname 
-# ^^^^^^ can be dontcare if just cloning
 ```
                 
 The singular published artifact contains all the information to do both the create or the clone.  
@@ -70,40 +63,6 @@ for create, and some are only necessary for clone.
 * *source_db_cluster_id*
   This is the Aurora RDS database cluster id to clone.  Even when creating a fresh database cluster,
   there should be a "source" database that it is re-creating - just without data.
-* *liquibase_changelog_path*
-  This is the local path to a Liquibase changelog.yaml file.  This can be `dontcare`
-  if you only want the artifact to be able to clone. 
-  
-  If the value is not dontcare, then this value must end in .yaml and reference an existing file.  For more information
-  on changelog format, please see: https://docs.liquibase.com/concepts/basic/changelog.html?_ga=2.262345164.1315656423.1591044713-322389793.1589995557. An example changelog:
-```
-databaseChangeLog:  
--  changeSet:  
-    id:  1  
-    author: whoareyou
-    changes:  
-        -  createTable:  
-            tableName:  person  
-            columns:  
-            -  column:  
-                name:  id  
-                type:  int  
-                autoIncrement:  true  
-                constraints:  
-                    primaryKey:  true  
-                    nullable:  false  
-            -  column:  
-                name:  firstname  
-                type:  varchar(50)  
-            -  column:  
-                name:  lastname  
-                type:  varchar(50)  
-                constraints:  
-                    nullable:  false  
-            -  column:  
-                name:  state  
-                type:  char(2)  
-```  
 * *subnet_ids*
   This can be a comma-delimited list of two or more subnet ids to create the target db in, e.g. subnet-1234, subnet-456
   or it can be "source" and discover the subnet-ids from the source db cluster.
@@ -142,27 +101,6 @@ Ultimately `docker run` is being executed but there is a wrapper CLI script `db-
 To clarify - installing database-artifact-factory contains both the tools to build and to converge, but an operator v. an end-user
 might use only one or the other.
 
-### Create a Fresh Database
-The following is the minimal command to create a fresh database.  It presumes a few things:
-* that AWS credentials are stored in ~/.aws/credentials
-* AWS profile is "default".
-* the Docker image db-artifact:latest contains the artifact to converge
-
-Also, be sure AWS_DEFAULT_REGION is set in the environment to us-east-1.
-```
-db-artifact-converge --create_mode create \
-                     --db_username fred \
-                     --db_password thisisafakepassw0rd
-```
-If any of those defaults are inappropriate, please invoke the `db-artifact-converge -h` to see the other options.
-
-When the database is created, the Liquibase changelog is applied to the database.  You can verify the database creation with:
-
-```
-psql -h <endpoint> -U fred -d <database_name>
-Password for user fred: ******
-\dt
-```
 ### Clone an Existing Database
 The following is the minimal command to clone an existing database.  It presumes a few things:
 * that AWS credentials are stored in ~/.aws/credentials
@@ -171,8 +109,7 @@ The following is the minimal command to clone an existing database.  It presumes
 
 BEWARE - you must specify the password, but the username follows from the source cluster
 ```
-db-artifact-converge --create_mode clone \
-                     --db_password thisisafakepassw0rd
+db-artifact-converge --db_password thisisafakepassw0rd
 ```
 
 If any of those defaults are inappropriate, please invoke the `db-artifact-converge -h` to see the other options.
